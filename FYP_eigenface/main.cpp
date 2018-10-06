@@ -9,7 +9,7 @@
 *   * Redistributions in binary form must reproduce the above copyright
 *     notice, this list of conditions and the following disclaimer in the
 *     documentation and/or other materials provided with the distribution.
-*   * Neither the name of the organization nor the names of its contributors
+*   * Neither the name of the organization nor the names of its contributors                                 
 *     may be used to endorse or promote products derived from this software
 *     without specific prior written permission.
 *
@@ -41,6 +41,37 @@ static Mat norm_0_255(InputArray _src) {
 		break;
 	}
 	return dst;
+}
+/*Use for seperating the training set and testing set
+  int training_num indicates the number of images in one class using for training, the others is used for testing.
+*/
+static void read_csv_seperate(const string& filename, vector<Mat>& training_images, vector<int>& training_labels, vector<Mat>& testing_images, vector<int>& testing_labels, int training_num = 5, char separator = ';') {
+	ifstream file(filename.c_str(), ifstream::in);
+
+	string line, path, classlabel;
+	int index, counter = 0;
+	while (getline(file, line)) {
+		stringstream liness(line);
+		getline(liness, path, separator);
+		getline(liness, classlabel);
+		index = counter % 10;
+		if (index < training_num)
+		{
+			if (!path.empty() && !classlabel.empty()) {
+				training_images.push_back(imread(path, 0).clone());
+				training_labels.push_back(atoi(classlabel.c_str()));
+			}
+		}
+		else
+		{
+			if (!path.empty() && !classlabel.empty()) {
+				testing_images.push_back(imread(path, 0).clone());
+				testing_labels.push_back(atoi(classlabel.c_str()));
+			}
+		}
+		//cout << training_labels[counter] << endl;
+		counter++;
+	}
 }
 static void read_csv(const string& filename, vector<Mat>& images, vector<int>& labels, char separator = ';') {
 	std::ifstream file(filename.c_str(), ifstream::in);
@@ -81,21 +112,22 @@ int main(int argc, const char *argv[]) {
 
 	// Get the path to your CSV.
 	string fn_csv = "C:/Users/75069/Documents/polyu/year4_sem1/FYP/dataset/ORL_finish/ORL_finish/csv.txt";//string(argv[1]);
-																													   // These vectors hold the images and corresponding labels.
+																										  // These vectors hold the images and corresponding labels.
 
-	vector<Mat> images;
-	vector<int> labels;
+	vector<Mat> images, testing_images;
+	vector<int> labels, testing_labels;
 	// Read in the data. This can fail if no valid
 	// input filename is given.
 	try {
-		read_csv(fn_csv, images, labels);
+		//read_csv(fn_csv, images, labels);
+		read_csv_seperate(fn_csv, images, labels, testing_images, testing_labels,8);
 	}
 	catch (cv::Exception& e) {
 		cerr << "Error opening file \"" << fn_csv << "\". Reason: " << e.msg << endl;
 		// nothing more we can do
 		exit(1);
 	}
-	
+
 	// Quit if there are not enough images for this demo.
 	if (images.size() <= 1) {
 		string error_message = "This demo needs at least 2 images to work. Please add more images to your data set!";
@@ -110,17 +142,20 @@ int main(int argc, const char *argv[]) {
 	// done, so that the training data (which we learn the
 	// cv::BasicFaceRecognizer on) and the test data we test
 	// the model with, do not overlap.
-	Mat testSample = images[images.size() - 1];
-	Mat testSample_down; Mat a;
-	//                                                     pyrDown pyrUp  320×243
+	//Mat testSample = images[images.size() - 1];
+	//Mat testSample = testing_images[0];
+	//cout << images.size() << endl;
+	//for low-resolution experiment 
+	//Mat testSample_down; Mat a;
+	//                                                     pyrDown pyrUp  92*112
 	//imshow("tst", testSample);
-	resize(testSample, testSample_down, Size(7, 7), cv::INTER_CUBIC);
-	resize(testSample_down, a, Size(92, 112), cv::INTER_CUBIC);
+	//resize(testSample, testSample_down, Size(7, 7), cv::INTER_CUBIC);
+	//resize(testSample_down, a, Size(92, 112), cv::INTER_CUBIC);
 	//imshow("a",a);
-	
-	int testLabel = labels[labels.size() - 1];
-	images.pop_back();
-	labels.pop_back();
+
+	//int testLabel = testing_labels[0];
+	//images.pop_back();
+	//labels.pop_back();
 	// The following lines create an Eigenfaces model for
 	// face recognition and train it with the images and
 	// labels read from the given CSV file.
@@ -140,7 +175,9 @@ int main(int argc, const char *argv[]) {
 	//
 	//      cv::createEigenFaceRecognizer(0, 123.0);
 	//
-	Ptr<BasicFaceRecognizer> model = EigenFaceRecognizer::create(400);
+
+	//training part
+	Ptr<BasicFaceRecognizer> model = EigenFaceRecognizer::create(40);
 	model->train(images, labels);
 	// The following line predicts the label of a given
 	// test image:
@@ -148,12 +185,32 @@ int main(int argc, const char *argv[]) {
 	//
 	// To get the confidence of a prediction call the model with:
 	//
-	      int predictedLabel = -1;
-	      double confidence = 0.0;
-	      model->predict(a, predictedLabel, confidence);
+	//int predictedLabel = -1;
+	//double confidence = 0.0;
+	//model->predict(testSample, predictedLabel, confidence);
+
+	//low-resolution experiment with seperated training set and testing set
+	int correct_num = 0; //the number of correct prediction
+	for (int i = 0; i < testing_images.size(); i++)
+	{
+		Mat testSample = testing_images[i], testSample_down;
+		int testLable = testing_labels[i];
+		resize(testSample, testSample_down, Size(5, 5), cv::INTER_CUBIC);
+		resize(testSample_down, testSample, Size(92, 112), cv::INTER_CUBIC);
+	
+		int predictedLabel = -1;
+		double confidence = 0.0;
+		model->predict(testSample, predictedLabel, confidence);
+		if (predictedLabel == testLable) { correct_num++; }
+	}
+	double accurancy = (double)correct_num / (double)testing_labels.size();
+	cout << accurancy << endl;
+	waitKey(0);
+
+
 	//
-	string result_message = format("Predicted class = %d / Actual class = %d.", predictedLabel, testLabel);
-	cout << result_message << endl;
+	//string result_message = format("Predicted class = %d / Actual class = %d.", predictedLabel, testLabel);
+	//cout << result_message << endl;
 	// Here is how to get the eigenvalues of this Eigenfaces model:
 	Mat eigenvalues = model->getEigenValues();
 	// And we can do the same to display the Eigenvectors (read Eigenfaces):
@@ -171,6 +228,7 @@ int main(int argc, const char *argv[]) {
 	imwrite(format("%s/mean.png", output_folder.c_str()), norm_0_255(mean.reshape(1, images[0].rows)));
 	}
 	*/
+	waitKey(0);
 	// Display or save the Eigenfaces:
 	for (int i = 0; i < min(15, W.cols); i++) {
 		string msg = format("Eigenvalue #%d = %.5f", i, eigenvalues.at<double>(i));
@@ -183,7 +241,7 @@ int main(int argc, const char *argv[]) {
 		// Show the image & apply a Jet colormap for better sensing.
 		Mat cgrayscale;
 		applyColorMap(grayscale, cgrayscale, COLORMAP_JET);
-	
+
 		imshow(format("eigenface_%d", i), grayscale);
 		imwrite(format("eigenface_%d.png", i), cgrayscale);
 		imwrite(format("eigenfaceg_%d.png", i), grayscale);
@@ -197,7 +255,7 @@ int main(int argc, const char *argv[]) {
 		}
 		*/
 	}
-	waitKey();
+	waitKey(0);
 	cout << W.cols << endl;
 	// Display or save the image reconstruction at some predefined steps:
 	for (int num_components = min(W.cols, 10); num_components < min(W.cols, 300); num_components += 15) {
