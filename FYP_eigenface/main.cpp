@@ -120,7 +120,7 @@ int main(int argc, const char *argv[]) {
 	// input filename is given.
 	try {
 		//read_csv(fn_csv, images, labels);
-		read_csv_seperate(fn_csv, images, labels, testing_images, testing_labels,8);
+		read_csv_seperate(fn_csv, images, labels, testing_images, testing_labels,1);
 	}
 	catch (cv::Exception& e) {
 		cerr << "Error opening file \"" << fn_csv << "\". Reason: " << e.msg << endl;
@@ -195,8 +195,8 @@ int main(int argc, const char *argv[]) {
 	{
 		Mat testSample = testing_images[i], testSample_down;
 		int testLable = testing_labels[i];
-		resize(testSample, testSample_down, Size(5, 5), cv::INTER_CUBIC);
-		resize(testSample_down, testSample, Size(92, 112), cv::INTER_CUBIC);
+		resize(testSample, testSample_down, Size(5, 5), cv::INTER_LINEAR);
+		resize(testSample_down, testSample, Size(92, 112), cv::INTER_LINEAR);
 	
 		int predictedLabel = -1;
 		double confidence = 0.0;
